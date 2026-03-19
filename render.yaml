@@ -1,0 +1,10 @@
+# render.yaml for Render Free deployment
+services:
+  - type: web
+    name: youtube-server
+    env: node
+    plan: free
+    buildCommand: "npm install"
+    startCommand: "npm start"
+    branch: main
+    autoDeploy: true
