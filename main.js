@@ -2,10 +2,12 @@
 import express from "express";
 import YouTube from "youtube-sr";
 import ytdl from "@distube/ytdl-core";
+import cors from "cors";
 
+ // allow all origins
 const app = express();
 const PORT = process.env.PORT || 3000;
-
+app.use(cors());
 /**
  * 🔍 SEARCH ENDPOINT
  * GET /search?q=keyword
