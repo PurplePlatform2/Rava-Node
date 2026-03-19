@@ -1,0 +1,17 @@
+{
+  "name": "Rava-server",
+  "version": "2.0.0",
+  "type": "module",
+  "main": "main.js",
+  "scripts": {
+    "start": "node main.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "youtube-sr": "^4.2.4",
+    "@distube/ytdl-core": "^4.0.0"
+  },
+  "engines": {
+    "node": "20.x"
+  }
+}
