@@ -12,7 +12,7 @@
     "youtube-sr": "^4.2.4",
     "@distube/ytdl-core": "^4.0.0",
     "cors": "^2.8.5",
-    "axois":"1.x.x"
+    "axios":"1.x.x"
   },
   "engines": {
     "node": ">=20.0.0"
