@@ -1,10 +1,10 @@
-// main.js
-import express from "express";
-import YOUTUBESR from "youtube-sr";
-import ytdl from "@distube/ytdl-core";
-import cors from "cors";
+// main.js (CommonJS)
+const express = require("express");
+const YouTubeSR = require("youtube-sr");
+const ytdl = require("@distube/ytdl-core");
+const cors = require("cors");
 
-// Utility logger
+// Logger utility
 const log = (type, message, meta = {}) => {
   const timestamp = new Date().toISOString();
   console[type](`[${timestamp}] ${message}`, meta);
@@ -13,7 +13,6 @@ const log = (type, message, meta = {}) => {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
@@ -27,7 +26,7 @@ app.get("/search", async (req, res) => {
 
   try {
     log("info", `Searching YouTube for: "${q}"`);
-    const videos = await YOUTUBESR.search(q, { limit: 10 });
+    const videos = await YouTubeSR.search(q, { limit: 10 });
 
     const results = videos.map(v => ({
       id: v.id,
@@ -86,7 +85,6 @@ app.get("/play/:id", (req, res) => {
   }
 });
 
-// Start server
 app.listen(PORT, () => {
   log("info", `Server running on http://localhost:${PORT}`);
 });
