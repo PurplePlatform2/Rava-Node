@@ -6,36 +6,47 @@ const YouTubeSR = require("youtube-sr").default;
 const ytdl = require("@distube/ytdl-core");
 const cors = require("cors");
 
-// 📂 Load cookies from c.txt → ARRAY format
+// 📂 Cookie file path
 const cookiePath = path.join(__dirname, "c.txt");
 
+// 🍪 Cookie array (ALWAYS array)
 let cookieArray = [];
 
-try {
-  const raw = fs.readFileSync(cookiePath, "utf-8");
+if (fs.existsSync(cookiePath)) {
+  console.log("✅ c.txt found, loading cookies...");
 
-  cookieArray = raw
-    .split("\n")
-    .filter(line => line && !line.startsWith("#"))
-    .map(line => {
-      const parts = line.split("\t");
+  try {
+    const raw = fs.readFileSync(cookiePath, "utf-8");
 
-      return {
-        domain: parts[0],
-        path: parts[2],
-        secure: parts[3] === "TRUE",
-        expirationDate: Number(parts[4]) || 0,
-        name: parts[5],
-        value: parts[6]
-      };
-    });
+    cookieArray = raw
+      .split("\n")
+      .filter(line => line && !line.startsWith("#"))
+      .map(line => {
+        const parts = line.split("\t");
 
-  console.log(`✅ Loaded ${cookieArray.length} cookies`);
-} catch (err) {
-  console.error("❌ Failed to load cookies:", err.message);
+        // Skip invalid lines
+        if (parts.length < 7) return null;
+
+        return {
+          domain: parts[0],
+          path: parts[2],
+          secure: parts[3] === "TRUE",
+          expires: Number(parts[4]) || 0, // ✅ correct key
+          name: parts[5],
+          value: parts[6]
+        };
+      })
+      .filter(Boolean);
+
+    console.log(`🍪 Loaded ${cookieArray.length} cookies`);
+  } catch (err) {
+    console.error("❌ Cookie parse error:", err.message);
+  }
+} else {
+  console.warn("⚠️ c.txt NOT found — running without cookies");
 }
 
-// 🔌 Create agent with COOKIE ARRAY (correct way)
+// 🔌 Agent (OFFICIAL WAY)
 const agent = ytdl.createAgent({
   cookies: cookieArray,
   headers: {
@@ -45,7 +56,7 @@ const agent = ytdl.createAgent({
   }
 });
 
-// Logger utility
+// Logger
 const log = (type, message, meta = {}) => {
   const timestamp = new Date().toISOString();
   console[type](`[${timestamp}] ${message}`, meta);
@@ -57,9 +68,6 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-/**
- * 🎯 Helper: Get TRUE lowest audio format
- */
 function getLowestAudioFormat(formats) {
   return formats
     .filter(f => f.hasAudio && !f.hasVideo)
@@ -70,28 +78,25 @@ function getLowestAudioFormat(formats) {
     })[0];
 }
 
-// 🔍 SEARCH ENDPOINT
+// 🔍 SEARCH
 app.get("/search", async (req, res) => {
   const q = req.query.q;
-  if (!q) {
-    log("warn", "Search request missing query", { query: q });
-    return res.status(400).json({ error: "Missing query" });
-  }
+  if (!q) return res.status(400).json({ error: "Missing query" });
 
   try {
-    log("info", `Searching YouTube for: "${q}"`);
+    log("info", `Searching: ${q}`);
     const videos = await YouTubeSR.search(q, { limit: 10 });
 
-    const results = videos.map(v => ({
-      id: v.id,
-      title: v.title,
-      duration: v.durationFormatted,
-      thumbnail: v.thumbnail?.url,
-      channel: v.channel?.name || "Unknown Channel",
-      url: `https://www.youtube.com/watch?v=${v.id}`
-    }));
-
-    res.json(results);
+    res.json(
+      videos.map(v => ({
+        id: v.id,
+        title: v.title,
+        duration: v.durationFormatted,
+        thumbnail: v.thumbnail?.url,
+        channel: v.channel?.name || "Unknown Channel",
+        url: `https://www.youtube.com/watch?v=${v.id}`
+      }))
+    );
   } catch (err) {
     log("error", "Search error", { error: err.message });
     res.status(500).json({ error: err.message });
@@ -100,14 +105,10 @@ app.get("/search", async (req, res) => {
 
 // 🎧 STREAM INFO
 app.get("/stream/:id", async (req, res) => {
-  const id = req.params.id;
-  const url = `https://www.youtube.com/watch?v=${id}`;
-
-  log("info", `Fetching LOWEST audio for ID: ${id}`);
+  const url = `https://www.youtube.com/watch?v=${req.params.id}`;
 
   try {
     const info = await ytdl.getInfo(url, { agent });
-
     const audio = getLowestAudioFormat(info.formats);
 
     res.json({
@@ -117,23 +118,20 @@ app.get("/stream/:id", async (req, res) => {
       channel: info.videoDetails.author?.name || "Unknown Channel"
     });
   } catch (err) {
-    log("error", "Stream info error", { error: err.message });
+    log("error", "Stream error", { error: err.message });
     res.status(500).json({ error: err.message });
   }
 });
 
-// ▶️ PLAY STREAM
+// ▶️ PLAY
 app.get("/play/:id", async (req, res) => {
-  const id = req.params.id;
-  const url = `https://www.youtube.com/watch?v=${id}`;
-
-  log("info", `Streaming LOWEST audio for ID: ${id}`);
+  const url = `https://www.youtube.com/watch?v=${req.params.id}`;
 
   try {
     const info = await ytdl.getInfo(url, { agent });
-
     const audio = getLowestAudioFormat(info.formats);
-    if (!audio) throw new Error("No audio format found");
+
+    if (!audio) throw new Error("No audio format");
 
     res.setHeader("Content-Type", "audio/mpeg");
 
@@ -141,12 +139,7 @@ app.get("/play/:id", async (req, res) => {
       format: audio,
       filter: "audioonly",
       agent
-    })
-      .on("error", err => {
-        log("error", "Streaming error", { error: err.message });
-        res.status(500).end();
-      })
-      .pipe(res);
+    }).pipe(res);
 
   } catch (err) {
     log("error", "Play error", { error: err.message });
@@ -155,5 +148,5 @@ app.get("/play/:id", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  log("info", `Server running on http://localhost:${PORT}`);
+  log("info", `Server running on port ${PORT}`);
 });
