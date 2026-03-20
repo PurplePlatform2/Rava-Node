@@ -3,11 +3,11 @@ const express = require("express");
 const YouTubeSR = require("youtube-sr").default;
 const ytdl = require("@distube/ytdl-core");
 const cors = require("cors");
-const { SocksProxyAgent } = require("socks-proxy-agent");
-const { HttpClient } = require("@distube/ytdl-core");
 
-// 🔌 Tor SOCKS5 agent
-const agent = new SocksProxyAgent("socks5://127.0.0.1:9050");
+// 🔌 Tor SOCKS5 proxy via createProxyAgent
+const agent = ytdl.createProxyAgent({
+  uri: "socks5://127.0.0.1:9050"
+});
 
 // Logger utility
 const log = (type, message, meta = {}) => {
@@ -37,7 +37,6 @@ function getLowestAudioFormat(formats) {
 // 🔍 SEARCH ENDPOINT
 app.get("/search", async (req, res) => {
   const q = req.query.q;
-
   if (!q) {
     log("warn", "Search request missing query", { query: q });
     return res.status(400).json({ error: "Missing query" });
@@ -45,7 +44,6 @@ app.get("/search", async (req, res) => {
 
   try {
     log("info", `Searching YouTube for: "${q}"`);
-
     const videos = await YouTubeSR.search(q, { limit: 10 });
 
     const results = videos.map(v => ({
@@ -53,7 +51,7 @@ app.get("/search", async (req, res) => {
       title: v.title,
       duration: v.durationFormatted,
       thumbnail: v.thumbnail?.url,
-      channel: v.channel?.name || "Unknown Book Reader",
+      channel: v.channel?.name || "Unknown Channel",
       url: `https://www.youtube.com/watch?v=${v.id}`
     }));
 
@@ -72,9 +70,8 @@ app.get("/stream/:id", async (req, res) => {
   log("info", `Fetching LOWEST audio for ID: ${id}`);
 
   try {
-    const info = await ytdl.getInfo(url, {
-      client: new HttpClient({ agent }) // updated for v4+
-    });
+    // ⚠️ Important: Use the official agent created above
+    const info = await ytdl.getInfo(url, { agent });
 
     const audio = getLowestAudioFormat(info.formats);
 
@@ -98,20 +95,17 @@ app.get("/play/:id", async (req, res) => {
   log("info", `Streaming LOWEST audio for ID: ${id}`);
 
   try {
-    const client = new HttpClient({ agent });
-    const info = await ytdl.getInfo(url, { client });
+    const info = await ytdl.getInfo(url, { agent });
 
     const audio = getLowestAudioFormat(info.formats);
-
     if (!audio) throw new Error("No audio format found");
 
     res.setHeader("Content-Type", "audio/mpeg");
 
     ytdl.downloadFromInfo(info, {
       format: audio,
-      client, // use same client with Tor agent
       filter: "audioonly",
-      highWaterMark: 1 << 25
+      agent // also use the proxy agent here
     })
       .on("error", err => {
         log("error", "Streaming error", { error: err.message });
