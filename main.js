@@ -6,29 +6,39 @@ const YouTubeSR = require("youtube-sr").default;
 const ytdl = require("@distube/ytdl-core");
 const cors = require("cors");
 
-// 📂 Load cookies from c.txt
+// 📂 Load cookies from c.txt → ARRAY format
 const cookiePath = path.join(__dirname, "c.txt");
-let cookies = "";
+
+let cookieArray = [];
 
 try {
-  cookies = fs.readFileSync(cookiePath, "utf-8")
+  const raw = fs.readFileSync(cookiePath, "utf-8");
+
+  cookieArray = raw
     .split("\n")
     .filter(line => line && !line.startsWith("#"))
     .map(line => {
       const parts = line.split("\t");
-      return `${parts[5]}=${parts[6]}`;
-    })
-    .join("; ");
 
-  console.log("✅ Cookies loaded successfully");
+      return {
+        domain: parts[0],
+        path: parts[2],
+        secure: parts[3] === "TRUE",
+        expirationDate: Number(parts[4]) || 0,
+        name: parts[5],
+        value: parts[6]
+      };
+    });
+
+  console.log(`✅ Loaded ${cookieArray.length} cookies`);
 } catch (err) {
   console.error("❌ Failed to load cookies:", err.message);
 }
 
-// 🔌 Create agent with cookies
+// 🔌 Create agent with COOKIE ARRAY (correct way)
 const agent = ytdl.createAgent({
+  cookies: cookieArray,
   headers: {
-    cookie: cookies,
     "user-agent":
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
       "(KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
@@ -88,7 +98,7 @@ app.get("/search", async (req, res) => {
   }
 });
 
-// 🎧 STREAM INFO (LOWEST AUDIO)
+// 🎧 STREAM INFO
 app.get("/stream/:id", async (req, res) => {
   const id = req.params.id;
   const url = `https://www.youtube.com/watch?v=${id}`;
@@ -112,7 +122,7 @@ app.get("/stream/:id", async (req, res) => {
   }
 });
 
-// ▶️ PROXY STREAM (LOWEST AUDIO)
+// ▶️ PLAY STREAM
 app.get("/play/:id", async (req, res) => {
   const id = req.params.id;
   const url = `https://www.youtube.com/watch?v=${id}`;
