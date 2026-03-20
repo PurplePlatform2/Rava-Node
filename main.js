@@ -51,7 +51,7 @@ app.get("/search", async (req, res) => {
       title: v.title,
       duration: v.durationFormatted,
       thumbnail: v.thumbnail?.url,
-      channel: v.channel?.name || "Unknown Channel",
+      channel: v.channel?.name || "Unknown Book Reader",
       url: `https://www.youtube.com/watch?v=${v.id}`
     }));
 
