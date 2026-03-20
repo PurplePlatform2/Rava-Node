@@ -16,83 +16,56 @@ const log = (type, message, meta = {}) => {
 };
 
 // ==========================
-// 📂 LOAD COOKIES SAFELY
+// 📂 LOAD COOKIES (JSON → HEADER STRING)
 // ==========================
-const cookiePath = path.join(__dirname, "c.txt");
+const cookiePath = path.join(__dirname, "c.json");
 
-let cookieArray = [];
+let cookieHeader = "";
 
 try {
-  log("info", "Loading cookies...", { path: cookiePath });
+  log("info", "Loading cookies.json...", { path: cookiePath });
 
-  const raw = fs.readFileSync(cookiePath, "utf-8");
-
-  cookieArray = raw
-    .split(/\r?\n/) // ✅ handles Windows/Linux
-    .filter(line => line && !line.startsWith("#"))
-    .map(line => {
-      // ✅ handles BOTH tab and space formats
-      const parts = line.trim().split(/\s+/);
-
-      if (parts.length < 7) return null;
-
-      return {
-        domain: parts[0],
-        path: parts[2],
-        secure: parts[3] === "TRUE",
-        expirationDate: Number(parts[4]) || undefined,
-        name: parts[5],
-        value: parts[6],
-        httpOnly: false
-      };
-    })
-    .filter(Boolean);
-
-  if (!Array.isArray(cookieArray)) {
-    throw new Error("Parsed cookies is not an array");
+  if (!fs.existsSync(cookiePath)) {
+    throw new Error("c.json not found");
   }
 
-  log("info", `✅ Cookies loaded`, {
-    count: cookieArray.length,
-    sample: cookieArray[0]
+  const raw = fs.readFileSync(cookiePath, "utf-8");
+  const parsed = JSON.parse(raw);
+
+  if (!Array.isArray(parsed)) {
+    throw new Error("c.json must be an array");
+  }
+
+  const validCookies = parsed
+    .filter(c => c.name && c.value)
+    .map(c => `${c.name}=${c.value}`);
+
+  cookieHeader = validCookies.join("; ");
+
+  log("info", "✅ Cookies prepared for header", {
+    count: validCookies.length,
+    preview: validCookies.slice(0, 3)
   });
 
 } catch (err) {
   log("error", "❌ Cookie load failed", { error: err.message });
-
-  // 🔥 NEVER let this crash your app
-  cookieArray = [];
+  cookieHeader = "";
 }
 
 // ==========================
-// 🔌 SAFE AGENT CREATION
+// 🌐 COMMON REQUEST OPTIONS
 // ==========================
-let agent;
-
-try {
-  agent = ytdl.createAgent({
-    cookies: Array.isArray(cookieArray) ? cookieArray : [],
+const REQUEST_OPTIONS = {
+  requestOptions: {
     headers: {
       "user-agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
         "(KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-      "accept-language": "en-US,en;q=0.9"
+      "accept-language": "en-US,en;q=0.9",
+      ...(cookieHeader ? { cookie: cookieHeader } : {})
     }
-  });
-
-  log("info", "✅ ytdl agent created successfully");
-
-} catch (err) {
-  log("error", "❌ Agent creation failed", { error: err.message });
-
-  // fallback agent (no cookies)
-  agent = ytdl.createAgent({
-    headers: {
-      "user-agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    }
-  });
-}
+  }
+};
 
 // ==========================
 // 🚀 EXPRESS APP
@@ -159,10 +132,9 @@ app.get("/stream/:id", async (req, res) => {
   log("info", "Fetching stream info", { id });
 
   try {
-    const info = await ytdl.getInfo(url, { agent });
+    const info = await ytdl.getInfo(url, REQUEST_OPTIONS);
 
     const audio = getLowestAudioFormat(info.formats);
-
     if (!audio) throw new Error("No audio format found");
 
     res.json({
@@ -192,24 +164,21 @@ app.get("/play/:id", async (req, res) => {
   log("info", "Streaming audio", { id });
 
   try {
-    const info = await ytdl.getInfo(url, { agent });
+    const info = await ytdl.getInfo(url, REQUEST_OPTIONS);
 
     const audio = getLowestAudioFormat(info.formats);
     if (!audio) throw new Error("No audio format");
 
     res.setHeader("Content-Type", "audio/mpeg");
 
-    ytdl
-      .downloadFromInfo(info, {
-        format: audio,
-        filter: "audioonly",
-        agent
-      })
+    ytdl(url, {
+      ...REQUEST_OPTIONS,
+      format: audio,
+      filter: "audioonly"
+    })
       .on("error", err => {
         log("error", "Streaming pipe error", { error: err.message });
-        if (!res.headersSent) {
-          res.status(500).end();
-        }
+        if (!res.headersSent) res.status(500).end();
       })
       .pipe(res);
 
@@ -225,7 +194,7 @@ app.get("/play/:id", async (req, res) => {
 app.get("/", (req, res) => {
   res.json({
     status: "OK",
-    cookiesLoaded: cookieArray.length,
+    cookiesLoaded: cookieHeader ? cookieHeader.split(";").length : 0,
     timestamp: new Date().toISOString()
   });
 });
@@ -234,7 +203,7 @@ app.get("/", (req, res) => {
 // 🚀 START SERVER
 // ==========================
 app.listen(PORT, () => {
-  log("info", `🚀 Server running`, {
+  log("info", "🚀 Server running", {
     url: `http://localhost:${PORT}`,
     port: PORT
   });
