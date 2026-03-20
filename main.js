@@ -1,12 +1,38 @@
 // main.js (CommonJS)
 const express = require("express");
+const fs = require("fs");
+const path = require("path");
 const YouTubeSR = require("youtube-sr").default;
 const ytdl = require("@distube/ytdl-core");
 const cors = require("cors");
 
-// 🔌 Tor SOCKS5 proxy via createProxyAgent
-const agent = ytdl.createProxyAgent({
-  uri: "socks5://127.0.0.1:9050"
+// 📂 Load cookies from c.txt
+const cookiePath = path.join(__dirname, "c.txt");
+let cookies = "";
+
+try {
+  cookies = fs.readFileSync(cookiePath, "utf-8")
+    .split("\n")
+    .filter(line => line && !line.startsWith("#"))
+    .map(line => {
+      const parts = line.split("\t");
+      return `${parts[5]}=${parts[6]}`;
+    })
+    .join("; ");
+
+  console.log("✅ Cookies loaded successfully");
+} catch (err) {
+  console.error("❌ Failed to load cookies:", err.message);
+}
+
+// 🔌 Create agent with cookies
+const agent = ytdl.createAgent({
+  headers: {
+    cookie: cookies,
+    "user-agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+      "(KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+  }
 });
 
 // Logger utility
@@ -51,7 +77,7 @@ app.get("/search", async (req, res) => {
       title: v.title,
       duration: v.durationFormatted,
       thumbnail: v.thumbnail?.url,
-      channel: v.channel?.name || "Unknown Book Reader",
+      channel: v.channel?.name || "Unknown Channel",
       url: `https://www.youtube.com/watch?v=${v.id}`
     }));
 
@@ -70,7 +96,6 @@ app.get("/stream/:id", async (req, res) => {
   log("info", `Fetching LOWEST audio for ID: ${id}`);
 
   try {
-    // ⚠️ Important: Use the official agent created above
     const info = await ytdl.getInfo(url, { agent });
 
     const audio = getLowestAudioFormat(info.formats);
@@ -105,7 +130,7 @@ app.get("/play/:id", async (req, res) => {
     ytdl.downloadFromInfo(info, {
       format: audio,
       filter: "audioonly",
-      agent // also use the proxy agent here
+      agent
     })
       .on("error", err => {
         log("error", "Streaming error", { error: err.message });
