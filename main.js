@@ -199,6 +199,56 @@ app.get("/", (req, res) => {
   });
 });
 
+// 🔥 UNIVERSAL API PROXY (DUAL MODE)
+const axios = require("axios");
+
+app.all("/proxy", async (req, res) => {
+  const { url, use } = req.query;
+
+  if (!url) {
+    return res.status(400).json({ error: "Missing url" });
+  }
+
+  try {
+    // ⚡ Decide mode
+    const useBrowserMode = String(use) === "1";
+
+    const config = {
+      method: req.method,
+      url,
+      data: req.body,
+      validateStatus: () => true,
+    };
+
+    // 🧠 Only attach headers/cookies if explicitly requested
+    if (useBrowserMode) {
+      config.headers = {
+        "user-agent": "Mozilla/5.0",
+        "content-type": "application/json",
+        ...(cookieHeader ? { cookie: cookieHeader } : {})
+      };
+    }
+
+    const r = await axios(config);
+
+    log("info", "Proxy hit", {
+      url,
+      mode: useBrowserMode ? "browser" : "clean",
+      status: r.status
+    });
+
+    res.status(r.status).send(r.data);
+
+  } catch (e) {
+    log("error", "Proxy failed", {
+      url,
+      mode: use === "1" ? "browser" : "clean",
+      error: e.message
+    });
+
+    res.status(500).json({ error: e.message });
+  }
+});
 // ==========================
 // 🚀 START SERVER
 // ==========================
