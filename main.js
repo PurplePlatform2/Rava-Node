@@ -1,6 +1,6 @@
 // main.js (CommonJS)
 const express = require("express");
-const YouTubeSR = require("youtube-sr");
+const YouTubeSR = require("youtube-sr").default;
 const ytdl = require("@distube/ytdl-core");
 const cors = require("cors");
 
