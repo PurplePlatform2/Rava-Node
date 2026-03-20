@@ -1,17 +1,29 @@
 {
   "name": "Rava-server",
-  "version": "2.0.0",
+  "version": "2.1.0",
+  "description": "Node.js backend for Rava - YouTube search & streaming via Tor",
   "main": "main.js",
+  "type": "commonjs",
   "scripts": {
     "start": "node main.js"
   },
-"dependencies": {
-  "express": "^4.18.2",
-  "youtube-sr": "^4.2.4",
-  "@distube/ytdl-core": "^4.0.0",
-  "cors": "^2.8.5"
+  "dependencies": {
+    "express": "^4.18.2",
+    "youtube-sr": "^4.2.4",
+    "@distube/ytdl-core": "^4.0.0",
+    "cors": "^2.8.5",
+    "socks-proxy-agent": "^6.0.1"
   },
   "engines": {
-    "node": "20.x"
-  }
+    "node": ">=20.0.0"
+  },
+  "keywords": [
+    "youtube",
+    "streaming",
+    "tor",
+    "proxy",
+    "express"
+  ],
+  "author": "Sanne Karibo",
+  "license": "MIT"
 }
