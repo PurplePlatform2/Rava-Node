@@ -48,13 +48,14 @@ app.get("/search", async (req, res) => {
     const videos = await YouTubeSR.search(q, { limit: 10 });
 
     const results = videos.map(v => ({
-      id: v.id,
-      title: v.title,
-      duration: v.durationFormatted,
-      thumbnail: v.thumbnail.url,
-      url: `https://www.youtube.com/watch?v=${v.id}`
-    }));
-
+  id: v.id,
+  title: v.title,
+  duration: v.durationFormatted,
+  thumbnail: v.thumbnail?.url,
+  channel: v.channel?.name || "Unknown Channel",
+  url: `https://www.youtube.com/watch?v=${v.id}`
+}));
+    
     res.json(results);
   } catch (err) {
     log("error", "Search error", { error: err.message });
