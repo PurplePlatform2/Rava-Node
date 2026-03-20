@@ -1,6 +1,6 @@
 // main.js
 import express from "express";
-import {search} from "youtube-sr";
+import YOUTUBESR from "youtube-sr";
 import ytdl from "@distube/ytdl-core";
 import cors from "cors";
 
@@ -27,7 +27,7 @@ app.get("/search", async (req, res) => {
 
   try {
     log("info", `Searching YouTube for: "${q}"`);
-    const videos = await search(q, { limit: 10 });
+    const videos = await YOUTUBESR.search(q, { limit: 10 });
 
     const results = videos.map(v => ({
       id: v.id,
